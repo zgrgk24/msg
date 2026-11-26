@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#10131c">
+<title>Şaka Kumandası</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#10131c; --panel:#192030; --panel2:#222b3f; --line:#2f3a54;
+  --txt:#eef1f8; --mut:#93a0bd; --acc:#5ab0ff; --red:#ff4d4d; --ok:#3ddc97; --warn:#ffc83d;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;overscroll-behavior:none;touch-action:manipulation}
+button,input,select,textarea{font:inherit;color:inherit}
+.screen{display:none;min-height:100vh;min-height:100dvh;padding:calc(var(--safe-t) + 18px) 16px 24px}
+.screen.on{display:block}
+h1{font-size:26px;margin:0 0 6px;letter-spacing:.2px}
+h2{font-size:17px;margin:20px 0 10px}
+p.sub{color:var(--mut);margin:0 0 18px;line-height:1.45}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:14px 16px;background:var(--panel2);color:var(--txt);font-weight:700;font-size:16px;text-align:center;cursor:pointer;transition:transform .08s, background .15s}
+.btn:active{transform:scale(.97)}
+.btn.acc{background:var(--acc);color:#06182b}
+.btn.red{background:var(--red);color:#fff}
+.btn.ok{background:var(--ok);color:#04251a}
+.btn.ghost{background:transparent;border:1px solid var(--line)}
+.btn.sm{padding:10px 12px;font-size:14px;border-radius:11px}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+label.f{display:block;font-size:13px;color:var(--mut);margin:10px 0 5px}
+input[type=text],input[type=tel],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:12px;font-size:16px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+textarea{min-height:76px;resize:vertical}
+input[type=range]{width:100%;accent-color:var(--acc);height:34px}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:15px}
+.chk input{width:22px;height:22px;accent-color:var(--acc)}
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pick button{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 8px;font-size:14px;cursor:pointer;text-align:center}
+.pick button.sel{border-color:var(--acc);background:#16304d;font-weight:700}
+.hint{font-size:13px;color:var(--mut);line-height:1.5}
+.warnbox{background:#2a2312;border:1px solid #5c4a14;color:#f1d98a;border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.5;margin:12px 0}
+
+/* home */
+.hero{padding-top:6vh}
+.mode{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:18px;padding:18px;margin-bottom:14px;cursor:pointer}
+.mode b{display:block;font-size:19px;margin-bottom:4px}
+.mode span{color:var(--mut);font-size:14px;line-height:1.4}
+.mode:active{transform:scale(.98)}
+
+/* target setup */
+.codebox{text-align:center;background:var(--panel);border:1px dashed var(--acc);border-radius:18px;padding:18px;margin:14px 0}
+.codebox .big{font-size:46px;letter-spacing:8px;font-weight:800;color:var(--acc);font-variant-numeric:tabular-nums}
+.stat{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--mut);justify-content:center;margin-top:6px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--warn);flex:none}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--red)}
+
+/* idle (hedef telefon sahte ekran) */
+#idle{position:fixed;inset:0;background:#000;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;user-select:none;-webkit-user-select:none}
+#idle .clk{font-size:86px;font-weight:300;letter-spacing:2px;font-family:"Helvetica Neue",Arial,sans-serif}
+#idle .dt{font-size:19px;opacity:.85;margin-top:4px}
+#exitZone{position:absolute;top:0;left:0;width:70px;height:70px}
+
+/* hedefte ben kamerası */
+#meWrap{position:fixed;z-index:50;display:none;background:#000;overflow:hidden}
+#meWrap.full{inset:0}
+#meWrap.small{right:12px;bottom:calc(var(--safe-b) + 14px);width:42vw;max-width:220px;aspect-ratio:3/4;border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.6)}
+#meWrap video{width:100%;height:100%;object-fit:cover}
+
+/* alarm ekranı */
+#alarmOv{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-size:30px;font-weight:800;text-align:center;animation:flash .5s steps(1) infinite;pointer-events:none}
+#alarmOv.tap{pointer-events:auto}
+#alarmOv .em{font-size:90px;margin-bottom:8px}
+@keyframes flash{0%{background:#d60000}50%{background:#fff;color:#d60000}}
+
+/* bildirimler */
+.nc{position:fixed;z-index:70;display:flex;flex-direction:column;gap:10px;width:min(94vw,390px);pointer-events:none}
+.nc>*{pointer-events:auto}
+#nc-tl{top:calc(var(--safe-t) + 10px);left:8px}
+#nc-tc{top:calc(var(--safe-t) + 10px);left:50%;transform:translateX(-50%)}
+#nc-tr{top:calc(var(--safe-t) + 10px);right:8px}
+#nc-ml{top:50%;left:8px;transform:translateY(-50%)}
+#nc-c{top:50%;left:50%;transform:translate(-50%,-50%)}
+#nc-mr{top:50%;right:8px;transform:translateY(-50%)}
+#nc-bl{bottom:calc(var(--safe-b) + 12px);left:8px;flex-direction:column-reverse}
+#nc-bc{bottom:calc(var(--safe-b) + 12px);left:50%;transform:translateX(-50%);flex-direction:column-reverse}
+#nc-br{bottom:calc(var(--safe-b) + 12px);right:8px;flex-direction:column-reverse}
+#nc-full{inset:0;width:auto;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}
+#nc-full:empty{display:none}
+.n{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.5);animation:pop .32s cubic-bezier(.2,1.25,.35,1);cursor:pointer}
+@keyframes pop{from{opacity:0;transform:scale(.85) translateY(-14px)}to{opacity:1;transform:none}}
+.n .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-size:25px;flex:none;background:rgba(127,127,127,.2)}
+.n .tx{min-width:0;flex:1}
+.n .hd{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.n b{font-size:15px;line-height:1.25}
+.n .tm{font-size:12px;opacity:.65;flex:none}
+.n p{margin:2px 0 0;font-size:14.5px;line-height:1.35;white-space:pre-wrap;word-break:break-word}
+.s-ios{background:rgba(246,246,248,.97);color:#111}
+.s-dark{background:rgba(28,30,38,.97);color:#fff;border:1px solid #3a3e4d}
+.s-danger{background:linear-gradient(135deg,#a8001b,#ee3b32);color:#fff;border:2px solid rgba(255,255,255,.45);animation:pop .32s cubic-bezier(.2,1.25,.35,1),glow 1s ease-in-out infinite alternate}
+.s-warn{background:#ffcf33;color:#1b1500}
+@keyframes glow{from{box-shadow:0 0 0 rgba(255,60,60,.0),0 12px 32px rgba(0,0,0,.5)}to{box-shadow:0 0 26px rgba(255,60,60,.9),0 12px 32px rgba(0,0,0,.5)}}
+#nc-full .n{width:min(90vw,420px);flex-direction:column;align-items:center;text-align:center;padding:30px 22px}
+#nc-full .n .ic{width:96px;height:96px;font-size:60px;border-radius:26px}
+#nc-full .n .hd{justify-content:center}
+#nc-full .n b{font-size:22px}
+#nc-full .n p{font-size:17px}
+
+/* kumanda */
+#ctrl{padding:0;padding-bottom:calc(76px + var(--safe-b))}
+.topbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(var(--safe-t) + 10px) 14px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.topbar .st{flex:1;font-size:14px;color:var(--mut);display:flex;align-items:center;gap:8px;min-width:0}
+.topbar .st span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .btn{width:auto;padding:9px 13px;font-size:13px}
+.tabbody{padding:14px 14px 0}
+.tab{display:none}.tab.on{display:block}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:var(--safe-b)}
+.nav button{background:none;border:0;padding:10px 4px 9px;font-size:12px;color:var(--mut);cursor:pointer}
+.nav button i{display:block;font-style:normal;font-size:22px;margin-bottom:2px}
+.nav button.on{color:var(--acc);font-weight:700}
+.posgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:240px;margin:6px auto 8px}
+.posgrid button{aspect-ratio:1.5;background:var(--bg);border:1px solid var(--line);border-radius:10px;font-size:20px;cursor:pointer}
+.posgrid button.sel{background:#16304d;border-color:var(--acc)}
+.vwrap{position:relative;background:#000;border-radius:16px;overflow:hidden;aspect-ratio:3/4;display:grid;place-items:center;border:1px solid var(--line)}
+.vwrap video{width:100%;height:100%;object-fit:contain;background:#000}
+.vwrap .ph{position:absolute;color:var(--mut);text-align:center;padding:20px;font-size:14px}
+.vwrap.small{max-width:180px;aspect-ratio:3/4}
+#log{font-size:12.5px;color:var(--mut);min-height:18px;padding:8px 14px 0}
+.toast{position:fixed;left:50%;top:calc(var(--safe-t) + 70px);transform:translateX(-50%);background:#0d2a1f;border:1px solid var(--ok);color:#c9f5e0;padding:9px 15px;border-radius:12px;font-size:14px;z-index:90;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.on{opacity:1}.toast.err{background:#341313;border-color:var(--red);color:#ffc9c9}
+@media (prefers-reduced-motion:reduce){.n,.s-danger{animation:none}}
+</style>
+</head>
+<body>
+
+<!-- ANA SEÇİM -->
+<section class="screen on" id="home">
+  <div class="hero">
+    <h1>Şaka Kumandası</h1>
+    <p class="sub">İki telefonda da bu sayfayı aç. Birini hedef, diğerini kumanda yap.</p>
+    <button class="mode" id="goCtrl"><b>🎮 Kumanda (ben)</b><span>Alarm çaldır, bildirim gönder, hedef telefonun kamerasına bak, kendi kameranı göster.</span></button>
+    <button class="mode" id="goTarget"><b>📱 Hedef telefon</b><span>Bir kod gösterir. Kumanda bu koda bağlanır.</span></button>
+    <div class="warnbox">Bu uygulama yalnızca kendi cihazların ya da haberi olan, izin veren kişilerin telefonları arasında şaka yapmak içindir. Kamera tarayıcıdan izin istemeden açılamaz.</div>
+  </div>
+</section>
+
+<!-- HEDEF -->
+<section class="screen" id="target">
+  <h1>📱 Hedef telefon</h1>
+  <p class="sub">Kumandadan bu kodu gir. Sonra “Başlat”a bas ve telefonu bırak.</p>
+  <div class="codebox">
+    <div class="big" id="code">······</div>
+    <div class="stat"><span class="dot" id="tdot"></span><span id="tstat">Hazırlanıyor…</span></div>
+  </div>
+  <div class="card">
+    <label class="f">Başlatınca ekran nasıl görünsün?</label>
+    <select id="idleMode">
+      <option value="black">Siyah ekran (telefon kapalı gibi)</option>
+      <option value="lock">Kilit ekranı saati</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="permCam" checked> Kamera iznini şimdi al (sonra uyarı çıkmasın)</label>
+  </div>
+  <button class="btn acc" id="startBtn">▶ Başlat</button>
+  <div class="warnbox">Tarayıcı sayfaları ekran kilitliyken ya da başka uygulamaya geçince çalışamaz. Başlat’tan sonra sayfayı ekranda açık bırak: ekran uyumaz, siyah modda telefon kapalı görünür. Çıkmak için sol üst köşeye 5 kez hızlıca dokun.</div>
+</section>
+
+<!-- KUMANDA: BAĞLANTI -->
+<section class="screen" id="connect">
+  <h1>🎮 Kumanda</h1>
+  <p class="sub">Hedef telefonda görünen 6 haneli kodu gir.</p>
+  <input type="tel" id="codeIn" inputmode="numeric" maxlength="6" placeholder="123456" style="font-size:32px;text-align:center;letter-spacing:8px;margin-bottom:12px">
+  <button class="btn acc" id="connBtn">Bağlan</button>
+  <div class="stat"><span class="dot" id="cdot0"></span><span id="cstat0">Bekleniyor</span></div>
+  <button class="btn ghost sm" id="backBtn" style="margin-top:22px">← Geri</button>
+</section>
+
+<!-- KUMANDA: PANEL -->
+<section class="screen" id="ctrl">
+  <div class="topbar">
+    <div class="st"><span class="dot" id="cdot"></span><span id="cstat">Bağlı değil</span></div>
+    <button class="btn red" id="stopAll">⏹ Hepsini durdur</button>
+  </div>
+  <div id="log"></div>
+  <div class="tabbody">
+
+    <!-- ALARM -->
+    <div class="tab on" id="tab-alarm">
+      <h2 style="margin-top:6px">Alarm sesi</h2>
+      <div class="pick" id="soundPick"></div>
+      <h2>Ses seviyesi: <span id="volTxt">80</span>%</h2>
+      <input type="range" id="vol" min="0" max="100" value="80">
+      <p class="hint">Bu, uygulama içi seviyedir. Hedef telefonun medya sesi kısıksa alarm da kısık çıkar.</p>
+      <div class="card">
+        <label class="chk"><input type="checkbox" id="aVib" checked> Titreşim (Android)</label>
+        <label class="chk"><input type="checkbox" id="aFlash" checked> Ekran kırmızı-beyaz yansın</label>
+        <label class="chk"><input type="checkbox" id="aTap"> Hedef ekrana dokununca susturabilsin</label>
+        <label class="f">Süre</label>
+        <select id="aDur"><option value="0">Ben durdurana kadar</option><option value="10">10 saniye</option><option value="30">30 saniye</option><option value="60">1 dakika</option></select>
+      </div>
+      <button class="btn red" id="alarmGo">🔔 Alarmı çaldır</button>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="alarmStop">⏹ Durdur</button>
+        <button class="btn ghost" id="alarmTest">🔈 Burada dene</button>
+      </div>
+    </div>
+
+    <!-- BİLDİRİM -->
+    <div class="tab" id="tab-notif">
+      <h2 style="margin-top:6px">Ekranda yeri</h2>
+      <div class="posgrid" id="posGrid"></div>
+      <button class="btn ghost sm" id="posFull" style="max-width:240px;margin:0 auto">⛶ Tam ekran</button>
+      <div class="card" style="margin-top:14px">
+        <label class="f">Görünüm</label>
+        <select id="nStyle">
+          <option value="ios">Açık (telefon bildirimi gibi)</option>
+          <option value="dark">Koyu</option>
+          <option value="danger">Kırmızı tehlike</option>
+          <option value="warn">Sarı uyarı</option>
+        </select>
+        <label class="f">Kendiliğinden kapansın mı?</label>
+        <select id="nAuto"><option value="0">Kapanmasın (dokununca kapanır)</option><option value="5">5 saniye</option><option value="10">10 saniye</option><option value="30">30 saniye</option></select>
+        <label class="chk"><input type="checkbox" id="nSound" checked> Bildirim sesi ve titreşimi</label>
+      </div>
+      <h2>Hazır bildirimler</h2>
+      <div class="grid2" id="presets"></div>
+      <h2>Kendi bildirimin</h2>
+      <div class="card">
+        <label class="f">Simge (emoji, sayı, harf — boş olabilir)</label>
+        <input type="text" id="cIcon" maxlength="8" placeholder="🛡️">
+        <label class="f">Başlık (boş bırakırsan başlıksız gider)</label>
+        <input type="text" id="cTitle" placeholder="Güvenlik Sistemi">
+        <label class="f">Yazı</label>
+        <textarea id="cBody" placeholder="Mesajını yaz… emoji 😈 ve rakam 123 serbest"></textarea>
+        <button class="btn acc" id="cSend" style="margin-top:12px">📨 Gönder</button>
+      </div>
+      <button class="btn" id="nClear">🧹 Ekrandaki bildirimleri temizle</button>
+    </div>
+
+    <!-- KAMERA -->
+    <div class="tab" id="tab-cam">
+      <h2 style="margin-top:6px">Hedef telefonun kamerası</h2>
+      <div class="vwrap"><video id="camV" autoplay playsinline muted></video><div class="ph" id="camPh">Kamera kapalı</div></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn acc" data-cam="user">🤳 Ön</button>
+        <button class="btn acc" data-cam="environment">📷 Arka</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" data-cam="off">⏹ Kapat</button>
+        <button class="btn ghost" id="camFs">⛶ Büyüt</button>
+        <button class="btn ghost" id="camSnap">📸 Kaydet</button>
+      </div>
+      <p class="hint" id="camNote">Hedef telefonun kamera izni vermiş olması gerekir. Hedefte “Başlat”a basılırken izin alınır.</p>
+    </div>
+
+    <!-- BEN -->
+    <div class="tab" id="tab-me">
+      <h2 style="margin-top:6px">Kendi kameramı hedefte göster</h2>
+      <p class="hint">Şakanın sonunda “şaka yaptım” demek için. Kameran hedef telefonun ekranında belirir.</p>
+      <div class="vwrap small" style="margin:10px 0"><video id="meV" autoplay playsinline muted></video><div class="ph" id="mePh">Kapalı</div></div>
+      <label class="f">Hedefte nasıl görünsün?</label>
+      <div class="row">
+        <button class="btn sm" id="layFull">Tam ekran</button>
+        <button class="btn sm" id="laySmall">Köşede küçük</button>
+      </div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="meMic" checked> Mikrofonum da açık olsun (sesim duyulsun)</label>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ok" data-me="user">🤳 Ön kamera</button>
+        <button class="btn ok" data-me="environment">📷 Arka kamera</button>
+      </div>
+      <button class="btn" data-me="off" style="margin-top:10px">⏹ Kameramı kapat</button>
+    </div>
+
+  </div>
+  <nav class="nav">
+    <button class="on" data-tab="alarm"><i>🔔</i>Alarm</button>
+    <button data-tab="notif"><i>💬</i>Bildirim</button>
+    <button data-tab="cam"><i>👁️</i>Kamera</button>
+    <button data-tab="me"><i>🙋</i>Ben</button>
+  </nav>
+</section>
+
+<!-- HEDEF: ekran katmanları -->
+<div id="idle"><div id="exitZone"></div><div class="clk" id="clk"></div><div class="dt" id="dt"></div></div>
+<div id="meWrap" class="full"><video id="meRemote" autoplay playsinline></video></div>
+<div id="alarmOv"><div class="em">🚨</div><div id="alarmTxt"></div></div>
+<div class="nc" id="nc-tl"></div><div class="nc" id="nc-tc"></div><div class="nc" id="nc-tr"></div>
+<div class="nc" id="nc-ml"></div><div class="nc" id="nc-c"></div><div class="nc" id="nc-mr"></div>
+<div class="nc" id="nc-bl"></div><div class="nc" id="nc-bc"></div><div class="nc" id="nc-br"></div>
+<div class="nc" id="nc-full"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s)}, $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+
+/* ---------- Genel ---------- */
+var PEER_OPTS={debug:0,config:{iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
+  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}
+]}};
+var PREFIX='sakakumanda-';
+var peer=null, conn=null, role=null, ctx=null;
+
+function show(id){$$('.screen').forEach(function(e){e.classList.remove('on')});$('#'+id).classList.add('on');window.scrollTo(0,0)}
+function send(o){try{if(conn&&conn.open)conn.send(o)}catch(e){}}
+var toastT;
+function toast(t,err){var el=$('#toast');el.textContent=t;el.className='toast on'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(function(){el.className='toast'},2200)}
+function ensureCtx(){
+  if(!ctx){var AC=window.AudioContext||window.webkitAudioContext;if(AC)ctx=new AC()}
+  if(ctx&&ctx.state==='suspended')ctx.resume();
+  return ctx;
+}
+function getCam(mode,audio){
+  var md=navigator.mediaDevices;
+  if(!md||!md.getUserMedia)return Promise.reject(new Error('Kamera desteklenmiyor (https gerekir)'));
+  return md.getUserMedia({video:{facingMode:{ideal:mode},width:{ideal:960},height:{ideal:960}},audio:!!audio}).catch(function(e){
+    if(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))throw e;
+    return md.getUserMedia({video:true,audio:!!audio});
+  });
+}
+function stopStream(s){if(s)s.getTracks().forEach(function(t){try{t.stop()}catch(e){}})}
+function vibrate(p){try{if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+var wl=null;
+function keepAwake(){try{if(navigator.wakeLock){navigator.wakeLock.request('screen').then(function(l){wl=l}).catch(function(){})}}catch(e){}}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'){if(role==='target')keepAwake();if(ctx&&ctx.state==='suspended')ctx.resume()}
+});
+
+/* ---------- Alarm sesleri (WebAudio) ---------- */
+function rep(n,a){var o=[];for(var i=0;i<n;i++)o=o.concat(a);return o}
+// segment: [başlangıç Hz, bitiş Hz, süre sn, ses (0 = sessizlik)]
+var SOUNDS={
+  digital:{n:'⏰ Dijital çalar saat',w:'square',s:rep(4,[[2000,2000,.07,.8],[0,0,.07,0]]).concat([[0,0,.5,0]])},
+  bell:{n:'🔔 Klasik zil',w:'triangle',r:2.4,s:rep(18,[[1500,1500,.04,1],[0,0,.03,0]]).concat([[0,0,.55,0]])},
+  police:{n:'🚓 Polis sireni',w:'sawtooth',s:[[600,1300,.7,.9],[1300,600,.7,.9]]},
+  ambulance:{n:'🚑 Ambulans (tiii-taaa)',w:'sawtooth',s:[[960,960,.55,.8],[770,770,.55,.8]]},
+  airraid:{n:'📢 Uzun siren',w:'sawtooth',s:[[380,820,3.5,.9],[820,380,3.5,.9]]},
+  fire:{n:'🔥 Yangın alarmı',w:'square',s:rep(3,[[960,960,.5,.7],[0,0,.5,0]]).concat([[0,0,1.5,0]])},
+  burglar:{n:'🕵️ Hırsız alarmı',w:'square',s:[[1800,1800,.13,.8],[1250,1250,.13,.8]]},
+  ring:{n:'📞 Telefon zili',w:'sine',r:1.0909,s:[[440,440,.4,1],[0,0,.2,0],[440,440,.4,1],[0,0,2,0]]},
+  beep:{n:'🚛 Geri vites bipi',w:'square',s:[[1000,1000,.8,.7],[0,0,.4,0]]}
+};
+var soundKey='digital', alarm=null, vibT=null, alarmTO=null;
+function tone(s,t0,S,dest){
+  var f0=s[0],f1=s[1],d=s[2],g=s[3];if(!g)return;
+  var gn=ctx.createGain();gn.gain.setValueAtTime(0,t0);gn.gain.linearRampToValueAtTime(g,t0+.005);
+  gn.gain.setValueAtTime(g,t0+d-.012);gn.gain.linearRampToValueAtTime(0,t0+d);gn.connect(dest);
+  var mk=function(k,amp){
+    var o=ctx.createOscillator();o.type=S.w;o.frequency.setValueAtTime(f0*k,t0);
+    if(f1!==f0)o.frequency.linearRampToValueAtTime(f1*k,t0+d);
+    var a=ctx.createGain();a.gain.value=amp;o.connect(a);a.connect(gn);o.start(t0);o.stop(t0+d+.02);
+  };
+  if(S.r){mk(1,.55);mk(S.r,.45)}else mk(1,1);
+}
+function startAlarm(key,vol){
+  stopAlarm();if(!ensureCtx())return;
+  var S=SOUNDS[key]||SOUNDS.digital,master=ctx.createGain();master.gain.value=vol;master.connect(ctx.destination);
+  alarm={m:master,S:S,i:0,next:ctx.currentTime+.05,timer:null};
+  var tick=function(){
+    if(!alarm)return;
+    if(alarm.next<ctx.currentTime)alarm.next=ctx.currentTime+.02;
+    while(alarm.next<ctx.currentTime+2.5){
+      var s=alarm.S.s[alarm.i%alarm.S.s.length];tone(s,alarm.next,alarm.S,alarm.m);alarm.next+=s[2];alarm.i++;
+    }
+  };
+  tick();alarm.timer=setInterval(tick,150);
+}
+function setVol(v){if(alarm&&ctx)alarm.m.gain.setTargetAtTime(v,ctx.currentTime,.02)}
+function stopAlarm(){
+  clearTimeout(alarmTO);clearInterval(vibT);vibT=null;vibrate(0);
+  if(alarm){var a=alarm;alarm=null;clearInterval(a.timer);try{a.m.gain.setTargetAtTime(0,ctx.currentTime,.015)}catch(e){}setTimeout(function(){try{a.m.disconnect()}catch(e){}},400)}
+  $('#alarmOv').style.display='none';
+}
+function ding(){
+  if(!ensureCtx())return;var t=ctx.currentTime;
+  [[880,0],[1318,.13],[1760,.26]].forEach(function(p){
+    var o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=p[0];
+    g.gain.setValueAtTime(0,t+p[1]);g.gain.linearRampToValueAtTime(.35,t+p[1]+.01);g.gain.exponentialRampToValueAtTime(.001,t+p[1]+.35);
+    o.connect(g);g.connect(ctx.destination);o.start(t+p[1]);o.stop(t+p[1]+.4);
+  });
+}
+
+/* ---------- Bildirim içerikleri ---------- */
+var PRESETS=[
+  {i:'🛡️',t:'Güvenlik Sistemi',b:'Telefonunuz tehdit altında! Cihazınıza yetkisiz erişim denemesi tespit edildi.',s:'danger'},
+  {i:'🦠',t:'Virüs tespit edildi',b:'Cihazınızda 7 zararlı yazılım bulundu. Hemen temizleyin!',s:'danger'},
+  {i:'💀',t:'Cihaz ele geçirildi',b:'Telefonunuz uzaktan kontrol ediliyor.',s:'dark'},
+  {i:'📷',t:'Kamera erişimi',b:'Bilinmeyen bir uygulama kameranıza erişiyor.',s:'dark'},
+  {i:'📍',t:'Konum paylaşılıyor',b:'Konumunuz gerçek zamanlı olarak başka bir cihazla paylaşılıyor.',s:'ios'},
+  {i:'🔒',t:'Hesap güvenliği',b:'Hesabınıza başka bir cihazdan giriş yapıldı. Siz miydiniz?',s:'ios'},
+  {i:'🔥',t:'Aşırı ısınma',b:'Telefon sıcaklığı kritik seviyede. Cihaz kapanacak.',s:'warn'},
+  {i:'🔋',t:'Pil kritik',b:'%1 pil kaldı. Cihaz 10 saniye içinde kapanacak.',s:'warn'},
+  {i:'📞',t:'Bilinmeyen numara',b:'Gizli numara arıyor…',s:'ios'},
+  {i:'',t:'',b:'Seni görüyorum. 👀',s:'dark'}
+];
+var POSES=[['tl','↖'],['tc','⬆'],['tr','↗'],['ml','⬅'],['c','⏺'],['mr','➡'],['bl','↙'],['bc','⬇'],['br','↘']];
+
+/* ---------- HEDEF TELEFON ---------- */
+var camStream=null,camCall=null,meCall=null,meLayout='full',ctrlId=null,code='',idleTap=[],clkT=null;
+function setT(txt,cls){$('#tstat').textContent=txt;$('#tdot').className='dot'+(cls?' '+cls:'')}
+
+function initTarget(){
+  role='target';show('target');makeTargetPeer();
+}
+function makeTargetPeer(){
+  if(peer){try{peer.destroy()}catch(e){}}
+  code=String(Math.floor(100000+Math.random()*900000));
+  peer=new Peer(PREFIX+code,PEER_OPTS);
+  setT('Sunucuya bağlanılıyor…');
+  peer.on('open',function(){$('#code').textContent=code;setT('Hazır — kumandadan kodu gir');});
+  peer.on('error',function(e){
+    if(e.type==='unavailable-id'){makeTargetPeer();return}
+    if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){setT('İnternet/sunucu sorunu, yeniden deneniyor…','bad');return}
+    setT('Hata: '+e.type,'bad');
+  });
+  peer.on('disconnected',function(){setT('Bağlantı koptu, yeniden deneniyor…','bad');setTimeout(function(){try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},2000)});
+  peer.on('connection',function(c){
+    if(conn&&conn.open){try{c.close()}catch(e){}return}
+    conn=c;ctrlId=c.peer;
+    c.on('open',function(){setT('✅ Kumanda bağlandı','ok');send({t:'hello'})});
+    c.on('data',onTargetMsg);
+    c.on('close',function(){conn=null;cleanupTarget();setT('Kumanda ayrıldı, bekleniyor…')});
+    c.on('error',function(){});
+  });
+  peer.on('call',function(call){
+    var kind=call.metadata&&call.metadata.kind;
+    if(kind==='me'){
+      if(meCall){try{meCall.close()}catch(e){}}
+      meCall=call;call.answer();
+      call.on('stream',function(st){
+        var v=$('#meRemote');v.srcObject=st;v.muted=false;
+        var p=v.play();if(p&&p.catch)p.catch(function(){v.muted=true;v.play().catch(function(){})});
+        applyLayout();$('#meWrap').style.display='block';
+      });
+      call.on('close',function(){hideMe()});
+    }else{try{call.close()}catch(e){}}
+  });
+}
+function applyLayout(){$('#meWrap').className=meLayout==='small'?'small':'full'}
+function hideMe(){$('#meWrap').style.display='none';var v=$('#meRemote');v.srcObject=null;if(meCall){try{meCall.close()}catch(e){}meCall=null}}
+function stopTargetCam(){
+  if(camCall){try{camCall.close()}catch(e){}camCall=null}
+  stopStream(camStream);camStream=null;
+}
+function cleanupTarget(){
+  stopAlarm();stopTargetCam();hideMe();clearNotifs();
+}
+function onTargetMsg(m){
+  if(!m||!m.t)return;
+  switch(m.t){
+    case 'alarm':runAlarm(m);break;
+    case 'alarmStop':stopAlarm();send({t:'st',txt:'Alarm durduruldu'});break;
+    case 'vol':setVol(m.v);break;
+    case 'notif':showNotif(m);break;
+    case 'notifClear':clearNotifs();break;
+    case 'cam':targetCam(m.mode);break;
+    case 'me':if(m.layout)meLayout=m.layout;if(m.mode==='off')hideMe();break;
+    case 'meLayout':meLayout=m.layout;applyLayout();break;
+    case 'all':cleanupTarget();break;
+  }
+}
+function runAlarm(m){
+  ensureCtx();startAlarm(m.sound,m.vol);
+  if(m.vib){var f=function(){vibrate([500,200,500,200])};f();vibT=setInterval(f,1800)}
+  var ov=$('#alarmOv');
+  if(m.flash){ov.style.display='flex';ov.className=m.tap?'tap':'';$('#alarmTxt').textContent=m.tap?'Susturmak için dokun':'';ov.onclick=m.tap?function(){stopAlarm();send({t:'st',txt:'Hedef alarmı susturdu'})}:null}
+  else if(m.tap){ov.style.display='none'}
+  if(m.dur>0)alarmTO=setTimeout(function(){stopAlarm();send({t:'st',txt:'Alarm süresi doldu'})},m.dur*1000);
+  send({t:'st',txt:'Alarm çalıyor'});
+}
+function showNotif(m){
+  var pos=m.pos||'tc',box=$('#nc-'+pos)||$('#nc-tc');
+  if(pos==='full'||pos==='c')while(box.firstChild)box.removeChild(box.firstChild);
+  var el=document.createElement('div');el.className='n s-'+(m.style||'ios');
+  if(m.icon){var ic=document.createElement('div');ic.className='ic';ic.textContent=m.icon;el.appendChild(ic)}
+  var tx=document.createElement('div');tx.className='tx';
+  var hd=document.createElement('div');hd.className='hd';
+  var b=document.createElement('b');b.textContent=m.title||'';
+  var tm=document.createElement('span');tm.className='tm';tm.textContent='şimdi';
+  if(m.title){hd.appendChild(b);hd.appendChild(tm);tx.appendChild(hd)}
+  var p=document.createElement('p');p.textContent=m.body||'';
+  if(m.body)tx.appendChild(p);
+  if(!m.title&&m.body){hd.appendChild(tm);hd.style.justifyContent='flex-end';hd.style.marginBottom='-2px';tx.insertBefore(hd,p)}
+  el.appendChild(tx);
+  var close=function(){if(el.parentNode){el.parentNode.removeChild(el);send({t:'st',txt:'Bildirim kapatıldı'})}};
+  el.onclick=close;box.appendChild(el);
+  if(m.auto>0)setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el)},m.auto*1000);
+  if(m.sound){ding();vibrate([200,100,200])}
+  send({t:'st',txt:'Bildirim ekranda'});
+}
+function clearNotifs(){$$('.nc').forEach(function(b){while(b.firstChild)b.removeChild(b.firstChild)})}
+function targetCam(mode){
+  stopTargetCam();
+  if(mode==='off'){send({t:'st',txt:'Kamera kapatıldı'});return}
+  getCam(mode,false).then(function(s){
+    if(!conn||!conn.open){stopStream(s);return}
+    camStream=s;camCall=peer.call(ctrlId,s,{metadata:{kind:'cam',mode:mode}});
+    send({t:'st',txt:(mode==='user'?'Ön':'Arka')+' kamera açıldı'});
+  }).catch(function(e){send({t:'err',txt:'Kamera açılamadı: '+((e&&e.name)||'bilinmeyen hata')+' (hedefte kamera izni verilmemiş olabilir)'})});
+}
+function updateClock(){
+  var d=new Date(),h=('0'+d.getHours()).slice(-2),mi=('0'+d.getMinutes()).slice(-2);
+  $('#clk').textContent=h+':'+mi;
+  $('#dt').textContent=d.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+}
+function enterIdle(){
+  var lock=$('#idleMode').value==='lock';
+  $('#clk').style.display=lock?'block':'none';$('#dt').style.display=lock?'block':'none';
+  $('#idle').style.display='flex';updateClock();clearInterval(clkT);clkT=setInterval(updateClock,10000);
+}
+function exitIdle(){$('#idle').style.display='none';clearInterval(clkT)}
+function startTarget(){
+  ensureCtx();keepAwake();
+  try{var de=document.documentElement;var fs=de.requestFullscreen||de.webkitRequestFullscreen;if(fs){var r=fs.call(de);if(r&&r.catch)r.catch(function(){})}}catch(e){}
+  // sesi "uyandır"
+  try{var o=ctx.createOscillator(),g=ctx.createGain();g.gain.value=0.0001;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.05)}catch(e){}
+  var go=function(){enterIdle();send({t:'st',txt:'Hedef telefon başlatıldı'})};
+  if($('#permCam').checked){
+    getCam('user',false).then(function(s){stopStream(s);go()}).catch(function(){toast('Kamera izni alınamadı',true);go()});
+  }else go();
+}
+
+/* ---------- KUMANDA ---------- */
+var curPos='tc',targetId='',retryT=null,camCallIn=null,meStream=null,meCallOut=null,meLay='full',connected=false,connecting=false;
+function setC(txt,cls){
+  ['#cstat','#cstat0'].forEach(function(s){$(s).textContent=txt});
+  ['#cdot','#cdot0'].forEach(function(s){$(s).className='dot'+(cls?' '+cls:'')});
+}
+function logMsg(t){var d=new Date();$('#log').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)+'  '+t}
+
+function connectCtrl(c){
+  role='ctrl';targetId=PREFIX+c;connected=false;
+  setC('Sunucuya bağlanılıyor…');
+  try{localStorage.setItem('lastCode',c)}catch(e){}
+  if(peer){try{peer.destroy()}catch(e){}}
+  peer=new Peer(PEER_OPTS);
+  peer.on('open',openConn);
+  peer.on('call',onCtrlCall);
+  peer.on('disconnected',function(){setTimeout(function(){try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},2000)});
+  peer.on('error',function(e){
+    if(e.type==='peer-unavailable'){setC('Hedef bulunamadı. Kod doğru mu, hedefte sayfa açık mı?','bad');scheduleRetry()}
+    else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){setC('İnternet/sunucu sorunu…','bad')}
+    else setC('Hata: '+e.type,'bad');
+  });
+}
+function scheduleRetry(){
+  clearTimeout(retryT);
+  retryT=setTimeout(function(){if(role==='ctrl'&&!connected&&peer&&!peer.destroyed&&peer.open)openConn()},3000);
+}
+function openConn(){
+  if(!peer||!peer.open)return;
+  setC('Hedefe bağlanılıyor…');
+  var c=peer.connect(targetId,{reliable:true,serialization:'json'});conn=c;
+  c.on('open',function(){
+    connected=true;setC('Bağlı ✓','ok');
+    if($('#connect').classList.contains('on'))show('ctrl');
+    logMsg('Hedefe bağlanıldı');
+  });
+  c.on('data',onCtrlMsg);
+  c.on('close',function(){
+    if(conn!==c)return;
+    connected=false;setC('Bağlantı koptu, yeniden deneniyor…','bad');scheduleRetry();
+    camReset();
+  });
+  c.on('error',function(){});
+}
+function onCtrlMsg(m){
+  if(!m)return;
+  if(m.t==='st')logMsg('Hedef: '+m.txt);
+  if(m.t==='err'){toast(m.txt,true);logMsg(m.txt);camReset()}
+}
+function onCtrlCall(call){
+  var kind=call.metadata&&call.metadata.kind;
+  if(kind!=='cam'){try{call.close()}catch(e){}return}
+  if(camCallIn){try{camCallIn.close()}catch(e){}}
+  camCallIn=call;call.answer();
+  call.on('stream',function(st){
+    var v=$('#camV');v.srcObject=st;v.muted=true;var p=v.play();if(p&&p.catch)p.catch(function(){});
+    $('#camPh').style.display='none';
+  });
+  call.on('close',function(){if(camCallIn===call)camReset()});
+}
+function camReset(){
+  if(camCallIn){var c=camCallIn;camCallIn=null;try{c.close()}catch(e){}}
+  $('#camV').srcObject=null;$('#camPh').style.display='grid';$('#camPh').textContent='Kamera kapalı';
+}
+function stopMe(notify){
+  if(meCallOut){try{meCallOut.close()}catch(e){}meCallOut=null}
+  stopStream(meStream);meStream=null;$('#meV').srcObject=null;$('#mePh').style.display='grid';
+  if(notify)send({t:'me',mode:'off'});
+}
+function startMe(mode){
+  stopMe(false);
+  getCam(mode,$('#meMic').checked).then(function(s){
+    if(!connected){stopStream(s);toast('Bağlantı yok',true);return}
+    meStream=s;$('#meV').srcObject=s;$('#mePh').style.display='none';
+    send({t:'me',mode:mode,layout:meLay});
+    meCallOut=peer.call(targetId,s,{metadata:{kind:'me'}});
+    logMsg('Kameran hedefte gösteriliyor');
+  }).catch(function(e){toast('Kamera açılamadı: '+((e&&e.name)||'hata'),true)});
+}
+function sendNotif(o){
+  if(!connected){toast('Bağlantı yok',true);return}
+  var m={t:'notif',pos:curPos,sound:$('#nSound').checked,auto:+$('#nAuto').value,style:o.s||$('#nStyle').value,icon:o.i,title:o.t,body:o.b};
+  send(m);toast('Bildirim gönderildi');
+}
+
+/* ---------- Arayüz bağlama ---------- */
+function buildUI(){
+  // alarm sesleri
+  var sp=$('#soundPick');
+  Object.keys(SOUNDS).forEach(function(k){
+    var b=document.createElement('button');b.textContent=SOUNDS[k].n;b.dataset.k=k;if(k===soundKey)b.className='sel';
+    b.onclick=function(){
+      soundKey=k;$$('#soundPick button').forEach(function(x){x.classList.toggle('sel',x===b)});
+      if(alarm&&role==='ctrl'&&alarm.test)startAlarm(k,$('#vol').value/100),alarm.test=true;
+    };
+    sp.appendChild(b);
+  });
+  // konum
+  var pg=$('#posGrid');
+  POSES.forEach(function(p){
+    var b=document.createElement('button');b.textContent=p[1];b.dataset.p=p[0];if(p[0]===curPos)b.className='sel';
+    b.onclick=function(){curPos=p[0];$$('#posGrid button').forEach(function(x){x.classList.toggle('sel',x===b)});$('#posFull').classList.remove('acc')};
+    pg.appendChild(b);
+  });
+  $('#posFull').onclick=function(){curPos='full';$$('#posGrid button').forEach(function(x){x.classList.remove('sel')});$('#posFull').classList.add('acc')};
+  // hazırlar
+  var pr=$('#presets');
+  PRESETS.forEach(function(p){
+    var b=document.createElement('button');b.className='btn sm';b.style.textAlign='left';
+    b.textContent=(p.i?p.i+' ':'')+(p.t||p.b);
+    b.onclick=function(){sendNotif(p)};pr.appendChild(b);
+  });
+}
+function bind(){
+  $('#goCtrl').onclick=function(){show('connect');try{var l=localStorage.getItem('lastCode');if(l)$('#codeIn').value=l}catch(e){}};
+  $('#goTarget').onclick=initTarget;
+  $('#backBtn').onclick=function(){show('home')};
+  $('#startBtn').onclick=startTarget;
+  $('#connBtn').onclick=function(){
+    var c=$('#codeIn').value.replace(/\D/g,'');
+    if(c.length!==6){setC('6 haneli kodu gir','bad');return}
+    ensureCtx();connectCtrl(c);
+  };
+  $('#codeIn').addEventListener('keydown',function(e){if(e.key==='Enter')$('#connBtn').click()});
+  // gizli çıkış
+  $('#exitZone').addEventListener('click',function(){
+    var n=Date.now();idleTap=idleTap.filter(function(t){return n-t<3000});idleTap.push(n);
+    if(idleTap.length>=5){idleTap=[];exitIdle()}
+  });
+  // sekmeler
+  $$('.nav button').forEach(function(b){b.onclick=function(){
+    $$('.nav button').forEach(function(x){x.classList.toggle('on',x===b)});
+    $$('.tab').forEach(function(t){t.classList.toggle('on',t.id==='tab-'+b.dataset.tab)});
+    window.scrollTo(0,0);
+  }});
+  // alarm
+  $('#vol').oninput=function(){
+    var v=$('#vol').value;$('#volTxt').textContent=v;
+    if(alarm&&alarm.test)setVol(v/100);
+    send({t:'vol',v:v/100});
+  };
+  $('#alarmGo').onclick=function(){
+    if(!connected){toast('Bağlantı yok',true);return}
+    send({t:'alarm',sound:soundKey,vol:$('#vol').value/100,vib:$('#aVib').checked,flash:$('#aFlash').checked,tap:$('#aTap').checked,dur:+$('#aDur').value});
+    toast('Alarm gönderildi');
+  };
+  $('#alarmStop').onclick=function(){send({t:'alarmStop'});toast('Durdurma gönderildi')};
+  $('#alarmTest').onclick=function(){
+    if(alarm&&alarm.test){stopAlarm();$('#alarmTest').textContent='🔈 Burada dene';return}
+    startAlarm(soundKey,$('#vol').value/100);if(alarm)alarm.test=true;$('#alarmTest').textContent='⏹ Denemeyi durdur';
+  };
+  // bildirim
+  $('#cSend').onclick=function(){
+    var t=$('#cTitle').value.trim(),b=$('#cBody').value.trim(),i=$('#cIcon').value.trim();
+    if(!t&&!b){toast('Başlık ya da yazı gir',true);return}
+    sendNotif({i:i,t:t,b:b});
+  };
+  $('#nClear').onclick=function(){send({t:'notifClear'});toast('Temizleme gönderildi')};
+  // kamera
+  $$('[data-cam]').forEach(function(b){b.onclick=function(){
+    if(!connected){toast('Bağlantı yok',true);return}
+    var m=b.dataset.cam;
+    if(m==='off'){send({t:'cam',mode:'off'});camReset();return}
+    $('#camPh').style.display='grid';$('#camPh').textContent='Kamera açılıyor…';
+    send({t:'cam',mode:m});
+  }});
+  $('#camFs').onclick=function(){
+    var v=$('#camV');try{if(v.requestFullscreen)v.requestFullscreen();else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();else if(v.webkitRequestFullscreen)v.webkitRequestFullscreen()}catch(e){}
+  };
+  $('#camSnap').onclick=function(){
+    var v=$('#camV');if(!v.videoWidth){toast('Görüntü yok',true);return}
+    var c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
+    var a=document.createElement('a');a.href=c.toDataURL('image/jpeg',.9);a.download='kare-'+Date.now()+'.jpg';document.body.appendChild(a);a.click();a.remove();
+  };
+  // ben
+  $$('[data-me]').forEach(function(b){b.onclick=function(){
+    if(!connected){toast('Bağlantı yok',true);return}
+    if(b.dataset.me==='off')stopMe(true);else startMe(b.dataset.me);
+  }});
+  var setLay=function(l){meLay=l;$('#layFull').classList.toggle('acc',l==='full');$('#laySmall').classList.toggle('acc',l==='small');send({t:'meLayout',layout:l})};
+  $('#layFull').onclick=function(){setLay('full')};$('#laySmall').onclick=function(){setLay('small')};
+  $('#layFull').classList.add('acc');
+  // hepsini durdur
+  $('#stopAll').onclick=function(){send({t:'all'});stopMe(false);camReset();if(alarm){stopAlarm();$('#alarmTest').textContent='🔈 Burada dene'}toast('Hepsi durduruldu')};
+}
+buildUI();bind();
+})();
+</script>
+</body>
+</html>
