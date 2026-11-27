@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#10131c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>Şaka Kumandası</title>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
@@ -213,6 +218,10 @@ input[type=range]{width:100%;accent-color:var(--acc);height:34px}
       <div class="posgrid" id="posGrid"></div>
       <button class="btn ghost sm" id="posFull" style="max-width:240px;margin:0 auto">⛶ Tam ekran</button>
       <div class="card" style="margin-top:14px">
+        <label class="f">Bildirim türü</label>
+        <select id="nMode"><option value="fake">Ekran içi (sahte)</option><option value="system">Gerçek sistem bildirimi (etiketli)</option><option value="both">İkisi birlikte</option></select>
+        <p class="hint">Gerçek bildirimde “Şaka bildirimi” etiketi görünür. Bu, uygulama açık ve bağlantı varken bildirim gösterir; uygulama kapalıyken uzaktan push için sunucu gerekir. Sistem bildiriminin yazı rengini işletim sistemi belirler.</p>
+        <label class="f">Mesaj rengi</label><input type="color" id="nColor" value="#eaf2ff" style="width:100%;height:42px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px">
         <label class="f">Görünüm</label>
         <select id="nStyle">
           <option value="ios">Açık (telefon bildirimi gibi)</option>
@@ -238,8 +247,7 @@ input[type=range]{width:100%;accent-color:var(--acc);height:34px}
       </div>
       <button class="btn" id="nClear">🧹 Ekrandaki bildirimleri temizle</button>
     </div>
-
-    <!-- KAMERA -->
+        <!-- KAMERA -->
     <div class="tab" id="tab-cam">
       <h2 style="margin-top:6px">Hedef telefonun kamerası</h2>
       <div class="vwrap"><video id="camV" autoplay playsinline muted></video><div class="ph" id="camPh">Kamera kapalı</div></div>
@@ -252,6 +260,8 @@ input[type=range]{width:100%;accent-color:var(--acc);height:34px}
         <button class="btn ghost" id="camFs">⛶ Büyüt</button>
         <button class="btn ghost" id="camSnap">📸 Kaydet</button>
       </div>
+      <label class="chk"><input type="checkbox" id="targetMic" checked> Hedef telefonun mikrofonunu da gönder (izin gerekir)</label>
+      <label class="f">Hedefin sesini kumandada</label><input type="range" id="targetAudioVol" min="0" max="100" value="85"><span class="hint" id="targetAudioTxt">85%</span>
       <p class="hint" id="camNote">Hedef telefonun kamera izni vermiş olması gerekir. Hedefte “Başlat”a basılırken izin alınır.</p>
     </div>
 
@@ -266,6 +276,8 @@ input[type=range]{width:100%;accent-color:var(--acc);height:34px}
         <button class="btn sm" id="laySmall">Köşede küçük</button>
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="meMic" checked> Mikrofonum da açık olsun (sesim duyulsun)</label>
+      <label class="f">Kendi mikrofon sesin (gönderilen)</label><input type="range" id="myAudioVol" min="0" max="100" value="85"><span class="hint" id="myAudioTxt">85%</span>
+      <label class="f">Hedefin sesi (kendi kameram ekranında)</label><input type="range" id="remoteMeVol" min="0" max="100" value="85"><span class="hint" id="remoteMeTxt">85%</span>
       <div class="row" style="margin-top:8px">
         <button class="btn ok" data-me="user">🤳 Ön kamera</button>
         <button class="btn ok" data-me="environment">📷 Arka kamera</button>
@@ -401,6 +413,7 @@ var POSES=[['tl','↖'],['tc','⬆'],['tr','↗'],['ml','⬅'],['c','⏺'],['mr'
 
 /* ---------- HEDEF TELEFON ---------- */
 var camStream=null,camCall=null,meCall=null,meLayout='full',ctrlId=null,code='',idleTap=[],clkT=null;
+var meRawStream=null,meAudioCtx=null,meAudioGain=null,meAudioDest=null;
 function setT(txt,cls){$('#tstat').textContent=txt;$('#tdot').className='dot'+(cls?' '+cls:'')}
 
 function initTarget(){
@@ -432,7 +445,7 @@ function makeTargetPeer(){
       if(meCall){try{meCall.close()}catch(e){}}
       meCall=call;call.answer();
       call.on('stream',function(st){
-        var v=$('#meRemote');v.srcObject=st;v.muted=false;
+        var v=$('#meRemote');v.srcObject=st;v.muted=false;v.volume=(+$('#remoteMeVol').value)/100;
         var p=v.play();if(p&&p.catch)p.catch(function(){v.muted=true;v.play().catch(function(){})});
         applyLayout();$('#meWrap').style.display='block';
       });
@@ -455,11 +468,12 @@ function onTargetMsg(m){
     case 'alarm':runAlarm(m);break;
     case 'alarmStop':stopAlarm();send({t:'st',txt:'Alarm durduruldu'});break;
     case 'vol':setVol(m.v);break;
-    case 'notif':showNotif(m);break;
+    case 'notif':if(m.mode==='fake'||m.mode==='both'||!m.mode)showNotif(m);if(m.mode==='system'||m.mode==='both')showSystemNotif(m);break;
     case 'notifClear':clearNotifs();break;
-    case 'cam':targetCam(m.mode);break;
+    case 'cam':targetCam(m.mode,m.audio);break;
     case 'me':if(m.layout)meLayout=m.layout;if(m.mode==='off')hideMe();break;
     case 'meLayout':meLayout=m.layout;applyLayout();break;
+    case 'meVol':$('#meRemote').volume=Math.max(0,Math.min(1,+m.v||0));break;
     case 'all':cleanupTarget();break;
   }
 }
@@ -472,10 +486,10 @@ function runAlarm(m){
   if(m.dur>0)alarmTO=setTimeout(function(){stopAlarm();send({t:'st',txt:'Alarm süresi doldu'})},m.dur*1000);
   send({t:'st',txt:'Alarm çalıyor'});
 }
-function showNotif(m){
+  function showNotif(m){
   var pos=m.pos||'tc',box=$('#nc-'+pos)||$('#nc-tc');
   if(pos==='full'||pos==='c')while(box.firstChild)box.removeChild(box.firstChild);
-  var el=document.createElement('div');el.className='n s-'+(m.style||'ios');
+  var el=document.createElement('div');el.className='n s-'+(m.style||'ios');if(m.color)el.style.color=m.color;
   if(m.icon){var ic=document.createElement('div');ic.className='ic';ic.textContent=m.icon;el.appendChild(ic)}
   var tx=document.createElement('div');tx.className='tx';
   var hd=document.createElement('div');hd.className='hd';
@@ -493,10 +507,10 @@ function showNotif(m){
   send({t:'st',txt:'Bildirim ekranda'});
 }
 function clearNotifs(){$$('.nc').forEach(function(b){while(b.firstChild)b.removeChild(b.firstChild)})}
-function targetCam(mode){
+function targetCam(mode,audio){
   stopTargetCam();
   if(mode==='off'){send({t:'st',txt:'Kamera kapatıldı'});return}
-  getCam(mode,false).then(function(s){
+  getCam(mode,!!audio).then(function(s){
     if(!conn||!conn.open){stopStream(s);return}
     camStream=s;camCall=peer.call(ctrlId,s,{metadata:{kind:'cam',mode:mode}});
     send({t:'st',txt:(mode==='user'?'Ön':'Arka')+' kamera açıldı'});
@@ -515,6 +529,7 @@ function enterIdle(){
 function exitIdle(){$('#idle').style.display='none';clearInterval(clkT)}
 function startTarget(){
   ensureCtx();keepAwake();
+  if('Notification' in window && Notification.permission==='default'){try{Notification.requestPermission()}catch(e){}}
   try{var de=document.documentElement;var fs=de.requestFullscreen||de.webkitRequestFullscreen;if(fs){var r=fs.call(de);if(r&&r.catch)r.catch(function(){})}}catch(e){}
   // sesi "uyandır"
   try{var o=ctx.createOscillator(),g=ctx.createGain();g.gain.value=0.0001;o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.05)}catch(e){}
@@ -579,7 +594,7 @@ function onCtrlCall(call){
   if(camCallIn){try{camCallIn.close()}catch(e){}}
   camCallIn=call;call.answer();
   call.on('stream',function(st){
-    var v=$('#camV');v.srcObject=st;v.muted=true;var p=v.play();if(p&&p.catch)p.catch(function(){});
+    var v=$('#camV');v.srcObject=st;v.muted=false;v.volume=(+$('#targetAudioVol').value)/100;var p=v.play();if(p&&p.catch)p.catch(function(){v.muted=true;});
     $('#camPh').style.display='none';
   });
   call.on('close',function(){if(camCallIn===call)camReset()});
@@ -590,24 +605,46 @@ function camReset(){
 }
 function stopMe(notify){
   if(meCallOut){try{meCallOut.close()}catch(e){}meCallOut=null}
-  stopStream(meStream);meStream=null;$('#meV').srcObject=null;$('#mePh').style.display='grid';
+  stopStream(meStream);if(meRawStream)stopStream(meRawStream);meStream=null;meRawStream=null;try{if(meAudioCtx)meAudioCtx.close()}catch(e){}meAudioCtx=null;meAudioGain=null;meAudioDest=null;$('#meV').srcObject=null;$('#mePh').style.display='grid';
   if(notify)send({t:'me',mode:'off'});
 }
 function startMe(mode){
   stopMe(false);
   getCam(mode,$('#meMic').checked).then(function(s){
     if(!connected){stopStream(s);toast('Bağlantı yok',true);return}
-    meStream=s;$('#meV').srcObject=s;$('#mePh').style.display='none';
+    meRawStream=s;meStream=makeGainStream(s,(+$('#myAudioVol').value)/100);$('#meV').srcObject=s;$('#mePh').style.display='none';
     send({t:'me',mode:mode,layout:meLay});
-    meCallOut=peer.call(targetId,s,{metadata:{kind:'me'}});
+    meCallOut=peer.call(targetId,meStream,{metadata:{kind:'me'}});
     logMsg('Kameran hedefte gösteriliyor');
   }).catch(function(e){toast('Kamera açılamadı: '+((e&&e.name)||'hata'),true)});
 }
 function sendNotif(o){
   if(!connected){toast('Bağlantı yok',true);return}
-  var m={t:'notif',pos:curPos,sound:$('#nSound').checked,auto:+$('#nAuto').value,style:o.s||$('#nStyle').value,icon:o.i,title:o.t,body:o.b};
+  var m={t:'notif',mode:$('#nMode').value,color:$('#nColor').value,pos:curPos,sound:$('#nSound').checked,auto:+$('#nAuto').value,style:o.s||$('#nStyle').value,icon:o.i,title:o.t,body:o.b};
   send(m);toast('Bildirim gönderildi');
 }
+
+/* ---------- Güvenli medya / bildirim yardımcıları ---------- */
+function makeGainStream(raw,volume){
+  var out=new MediaStream();raw.getVideoTracks().forEach(function(t){out.addTrack(t)});
+  var ats=raw.getAudioTracks();if(!ats.length)return out;
+  var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return raw;
+  meAudioCtx=new AC();if(meAudioCtx.state==='suspended')meAudioCtx.resume().catch(function(){});var source=meAudioCtx.createMediaStreamSource(new MediaStream(ats));
+  meAudioGain=meAudioCtx.createGain();meAudioGain.gain.value=volume;
+  meAudioDest=meAudioCtx.createMediaStreamDestination();source.connect(meAudioGain);meAudioGain.connect(meAudioDest);
+  meAudioDest.stream.getAudioTracks().forEach(function(t){out.addTrack(t)});return out;
+}
+function showSystemNotif(m){
+  if(!('Notification' in window)){toast('Bu tarayıcı sistem bildirimini desteklemiyor',true);return}
+  if(Notification.permission!=='granted'){toast('Hedef telefonda sistem bildirimi izni verilmemiş. Hedef cihazdan izin verilmeli.',true);return}
+  var title='🎭 Şaka bildirimi • '+(m.icon?m.icon+' ':'')+(m.title||'');var body=m.body||'';
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(function(reg){reg.showNotification(title||body||'Bildirim',{body:body,icon:'icon.svg',badge:'icon.svg',tag:'jaka-'+Date.now(),data:{color:m.color||'#5ab0ff'}})}).catch(function(){new Notification(title||body,{body:body,icon:'icon.svg'})})}
+    else new Notification(title||body,{body:body,icon:'icon.svg'});
+    send({t:'st',txt:'Gerçek sistem bildirimi gösterildi'});
+  }catch(e){toast('Sistem bildirimi gösterilemedi: '+(e.name||'hata'),true)}
+}
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('Service worker:',e)})})}
 
 /* ---------- Arayüz bağlama ---------- */
 function buildUI(){
@@ -688,7 +725,7 @@ function bind(){
     var m=b.dataset.cam;
     if(m==='off'){send({t:'cam',mode:'off'});camReset();return}
     $('#camPh').style.display='grid';$('#camPh').textContent='Kamera açılıyor…';
-    send({t:'cam',mode:m});
+    send({t:'cam',mode:m,audio:$('#targetMic').checked});
   }});
   $('#camFs').onclick=function(){
     var v=$('#camV');try{if(v.requestFullscreen)v.requestFullscreen();else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();else if(v.webkitRequestFullscreen)v.webkitRequestFullscreen()}catch(e){}
@@ -706,6 +743,10 @@ function bind(){
   var setLay=function(l){meLay=l;$('#layFull').classList.toggle('acc',l==='full');$('#laySmall').classList.toggle('acc',l==='small');send({t:'meLayout',layout:l})};
   $('#layFull').onclick=function(){setLay('full')};$('#laySmall').onclick=function(){setLay('small')};
   $('#layFull').classList.add('acc');
+  // Bağımsız ses seviyeleri
+  $('#targetAudioVol').oninput=function(){var v=+this.value/100;$('#targetAudioTxt').textContent=this.value+'%';$('#camV').volume=v;};
+  $('#myAudioVol').oninput=function(){var v=+this.value/100;$('#myAudioTxt').textContent=this.value+'%';if(meAudioGain&&meAudioCtx)meAudioGain.gain.setTargetAtTime(v,meAudioCtx.currentTime,.03);};
+  $('#remoteMeVol').oninput=function(){var v=+this.value/100;$('#remoteMeTxt').textContent=this.value+'%';$('#meRemote').volume=v;send({t:'meVol',v:v});};
   // hepsini durdur
   $('#stopAll').onclick=function(){send({t:'all'});stopMe(false);camReset();if(alarm){stopAlarm();$('#alarmTest').textContent='🔈 Burada dene'}toast('Hepsi durduruldu')};
 }
